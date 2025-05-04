@@ -1,12 +1,13 @@
+#include <load_data.h>
 #include <core-impl.h>
 
 int main(int argc, char **argv)
 {
     printf("Starting CudaSGD Benchmark...\n");
     // Default parameters
-    int numSamples = 1000000;
-    int numFeatures = 10;
-    float learningRate = 0.01f;
+    int numSamples = 8348650;
+    int numFeatures = 6;
+    float learningRate = 0.001f;
     int batchSize = 256;
     int maxEpochs = 10;
 
@@ -14,44 +15,15 @@ int main(int argc, char **argv)
     printf("Initializing variables...\n");
     float *h_features = new float[numSamples * numFeatures];
     float *h_labels = new float[numSamples];
-    float *h_true_weights = new float[numFeatures];
 
-    if (!h_features || !h_labels || !h_true_weights)
+    if (!h_features || !h_labels)
     {
         fprintf(stderr, "Failed to allocate host memory.\n");
         return -1;
     }
 
-    std::mt19937 gen(42);
-    std::normal_distribution<float> feat_dist(0.0f, 1.0f);
-    std::normal_distribution<float> noise_dist(0.0f, 0.1f);
-
-    // Generate true weights
-    printf("Generating true weights...\n");
-    for (int j = 0; j < numFeatures; j++)
-    {
-        h_true_weights[j] = feat_dist(gen);
-    }
-    // Print true weights for reference
-    printf("True weights: ");
-    for (int j = 0; j < numFeatures; j++)
-    {
-        printf("%.6f ", h_true_weights[j]);
-    }
-    printf("\n");
-
-    // Generate synthetic data
-    printf("Generating synthetic features and labels...\n");
-    for (int i = 0; i < numSamples; i++)
-    {
-        float label = 0.0f;
-        for (int j = 0; j < numFeatures; j++)
-        {
-            h_features[i * numFeatures + j] = feat_dist(gen);
-            label += h_features[i * numFeatures + j] * h_true_weights[j];
-        }
-        h_labels[i] = label + noise_dist(gen);
-    }
+    // Load data from CSV file
+    loadData("data/train_truncated.csv", h_features, h_labels, numSamples, numFeatures);
 
     // Create SGD instance
     printf("Creating CudaSGD instance...\n");
@@ -81,21 +53,20 @@ int main(int argc, char **argv)
     printf("\n");
 
     // Compute mean squared error
-    float mse = 0.0f;
-    for (int i = 0; i < numFeatures; i++)
-    {
-        float diff = h_learned_weights[i] - h_true_weights[i];
-        mse += diff * diff;
-    }
-    mse /= numFeatures;
+    // float mse = 0.0f;
+    // for (int i = 0; i < numFeatures; i++)
+    // {
+    //     float diff = h_learned_weights[i] - h_true_weights[i];
+    //     mse += diff * diff;
+    // }
+    // mse /= numFeatures;
 
     printf("Training complete.\n");
-    printf("Mean squared error between true and learned weights: %.8f\n", mse);
+    // printf("Mean squared error between true and learned weights: %.8f\n", mse);
 
     // Clean up
     delete[] h_features;
     delete[] h_labels;
-    delete[] h_true_weights;
     delete[] h_learned_weights;
 
     return 0;

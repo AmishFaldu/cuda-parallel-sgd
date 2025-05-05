@@ -228,7 +228,7 @@ void CudaSGD::trainWithCustomKernels()
     CHECK_CUDA_ERROR(cudaMalloc((void **)&d_mse, sizeof(float)));
 
     float learningRate = initialLearningRate;
-    int totalBatches = 0;
+    // int totalBatches = 0;
     const int gradBlockSize = 256;
     const int blockSize = 256;
     const int gridSize = (batchSize + blockSize - 1) / blockSize;
@@ -240,7 +240,7 @@ void CudaSGD::trainWithCustomKernels()
         // Reset MSE at the start of each epoch
         CHECK_CUDA_ERROR(cudaMemset(d_mse, 0, sizeof(float)));
         // Reset total batches for this epoch
-        totalBatches = 0;
+        // totalBatches = 0;
 
         for (int batchStart = 0; batchStart < numSamples; batchStart += batchSize)
         {
@@ -264,18 +264,16 @@ void CudaSGD::trainWithCustomKernels()
             updateWeightsKernel<<<(numFeatures + 255) / 256, 256>>>(
                 d_weights, d_gradients, learningRate, numFeatures);
 
-            CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-
             // Increment total batches processed
-            totalBatches++;
+            // totalBatches++;
         }
 
         learningRate = initialLearningRate / pow(epoch + 1, exponent);
 
         // Copy MSE from device to host and print it
-        float h_mse = 0.0f;
-        CHECK_CUDA_ERROR(cudaMemcpy(&h_mse, d_mse, sizeof(float), cudaMemcpyDeviceToHost));
-        printf("[INFO] Completed epoch %d of %d. MSE: %.6f. Learning Rate: %.6f\n", epoch + 1, maxEpochs, h_mse / totalBatches, learningRate);
+        // float h_mse = 0.0f;
+        // CHECK_CUDA_ERROR(cudaMemcpy(&h_mse, d_mse, sizeof(float), cudaMemcpyDeviceToHost));
+        printf("[INFO] Completed epoch %d of %d. Learning Rate: %.6f\n", epoch + 1, maxEpochs, learningRate);
     }
 
     printf("[INFO] Cleaning up resources...\n");
@@ -293,7 +291,7 @@ void CudaSGD::trainWithMemoryCoalescing()
     CHECK_CUDA_ERROR(cudaMalloc((void **)&d_mse, sizeof(float)));
 
     float learningRate = initialLearningRate;
-    int totalBatches = 0;
+    // int totalBatches = 0;
     const int gradBlockSize = 256;
     const int blockSize = 256;
     const int gridSize = (batchSize + blockSize - 1) / blockSize;
@@ -305,7 +303,7 @@ void CudaSGD::trainWithMemoryCoalescing()
         // Reset MSE at the start of each epoch
         CHECK_CUDA_ERROR(cudaMemset(d_mse, 0, sizeof(float)));
         // Reset total batches for this epoch
-        totalBatches = 0;
+        // totalBatches = 0;
 
         for (int batchStart = 0; batchStart < numSamples; batchStart += batchSize)
         {
@@ -328,13 +326,13 @@ void CudaSGD::trainWithMemoryCoalescing()
             updateWeightsKernel<<<(numFeatures + 255) / 256, 256>>>(
                 d_weights, d_gradients, learningRate, numFeatures);
 
-            totalBatches++;
+            // totalBatches++;
         }
 
         // Copy MSE from device to host and print it
-        float h_mse = 0.0f;
-        CHECK_CUDA_ERROR(cudaMemcpy(&h_mse, d_mse, sizeof(float), cudaMemcpyDeviceToHost));
-        printf("[INFO] Completed epoch %d of %d. MSE: %.6f. Learning Rate: %.6f\n", epoch + 1, maxEpochs, h_mse / totalBatches, learningRate);
+        // float h_mse = 0.0f;
+        // CHECK_CUDA_ERROR(cudaMemcpy(&h_mse, d_mse, sizeof(float), cudaMemcpyDeviceToHost));
+        printf("[INFO] Completed epoch %d of %d. Learning Rate: %.6f\n", epoch + 1, maxEpochs, learningRate);
 
         // Update learning rate using inverse scaling
         learningRate = initialLearningRate / pow(epoch + 1, exponent);
@@ -370,8 +368,16 @@ void CudaSGD::benchmark()
 
     for (const auto &method : methods)
     {
-        // Reset weights
-        CHECK_CUDA_ERROR(cudaMemset(d_weights, 0, numFeatures * sizeof(float)));
+        // Initialize weights with a normal distribution
+        std::default_random_engine generator;
+        std::normal_distribution<float> distribution(0.0f, 0.1f); // Mean 0, StdDev 0.1
+
+        std::vector<float> initialWeights(numFeatures);
+        for (int i = 0; i < numFeatures; ++i)
+        {
+            initialWeights[i] = distribution(generator);
+        }
+        CHECK_CUDA_ERROR(cudaMemcpy(d_weights, initialWeights.data(), numFeatures * sizeof(float), cudaMemcpyHostToDevice));
 
         auto start = std::chrono::high_resolution_clock::now();
         train(method);

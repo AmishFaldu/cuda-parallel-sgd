@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --job-name=project
+#SBATCH --output=%x.%j.out # %x.%j expands to slurm JobName.JobID
+#SBATCH --error=%x.%j.err
+#SBATCH --partition=gpu
+#SBATCH --qos=standard
+#SBATCH --account=2025-spring-ds-642-bader-af557 # Replace it with your account name
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:1
+#SBATCH --time=0-00:5:00 # D-HH:MM:SS
+#SBATCH --mem=32G
+
+
+#this job will ask for 1 A100 GPU on a GPU node for 30 minute
+#this job would potentially charge 0.05 GPU SUs
+
+#echo commands to stdout
+set -x
+
+#run pre-compiled program
+
+module load CUDA/12.4.0
+./main

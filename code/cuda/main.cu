@@ -37,12 +37,12 @@ int main(int argc, char **argv)
     sgd.loadData(h_features, h_features_transposed, h_labels);
 
     // Benchmark different implementations
-    // printf("Benchmarking different implementations...\n");
-    // sgd.benchmark();
+    printf("Benchmarking different implementations...\n");
+    sgd.benchmark();
 
     // Train using the optimized method
-    printf("Training with CudaSGD...\n");
-    sgd.train("coalesced");
+    // printf("Training with CudaSGD...\n");
+    // sgd.train("coalesced");
 
     // Get and evaluate the learned weights
     printf("Evaluating learned weights...\n");
@@ -55,17 +55,7 @@ int main(int argc, char **argv)
     }
     printf("\n");
 
-    // Compute mean squared error
-    // float mse = 0.0f;
-    // for (int i = 0; i < numFeatures; i++)
-    // {
-    //     float diff = h_learned_weights[i] - h_true_weights[i];
-    //     mse += diff * diff;
-    // }
-    // mse /= numFeatures;
-
     printf("Training complete.\n");
-    // printf("Mean squared error between true and learned weights: %.8f\n", mse);
 
     // Clean up
     delete[] h_features;

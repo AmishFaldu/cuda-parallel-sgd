@@ -44,12 +44,13 @@ def get_confirm_token(response):
 
 
 # Example usage
-shareable_link = (
-    "https://drive.google.com/file/d/162jvy2ZxodG4AGaDF1y_FLOUxoJK5tfy/view?usp=sharing"
-)
-output_file = "data/train_truncated.csv"
+shareable_link = [
+    "https://drive.google.com/file/d/162jvy2ZxodG4AGaDF1y_FLOUxoJK5tfy/view?usp=sharing",
+    "https://drive.google.com/file/d/18RHw7o5UB1wSJ6QBcJfhr_bnljpcrmtd/view?usp=sharing",
+]
+output_file = ["data/train_truncated.csv", "data/train_truncated_transposed.csv"]
 
-# Ensure the output directory exists
-os.makedirs(os.path.dirname(output_file), exist_ok=True)
-
-download_file_from_google_drive(shareable_link, output_file)
+for link, file in zip(shareable_link, output_file):
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(file), exist_ok=True)
+    download_file_from_google_drive(link, file)

@@ -1,70 +1,3 @@
-__global__ void computeGradientsWarpKernel(const float *features, const float *labels,
-                                           const float *predictions, float *gradients,
-                                           int numSamples, int numFeatures, int batchOffset,
-                                           int batchSize)
-{
-    extern __shared__ float sharedGradients[];
-
-    int featureIdx = blockIdx.x;
-    int localThreadIdx = threadIdx.x;
-    int warpSize = 32;
-    int warpIdx = localThreadIdx / warpSize;
-    int laneIdx = localThreadIdx % warpSize;
-    int numWarps = blockDim.x / warpSize;
-
-    // Initialize shared memory
-    if (localThreadIdx < numWarps)
-    {
-        sharedGradients[localThreadIdx] = 0.0f;
-    }
-    __syncthreads();
-
-    // Compute partial gradients
-    float gradientSum = 0.0f;
-
-    for (int i = localThreadIdx; i < batchSize; i += blockDim.x)
-    {
-        int sampleIdx = batchOffset + i;
-        if (sampleIdx < numSamples)
-        {
-            float error = predictions[i] - labels[sampleIdx];
-            gradientSum += error * features[sampleIdx * numFeatures + featureIdx];
-        }
-    }
-
-    // Warp-level reduction using shuffle
-    for (int offset = warpSize / 2; offset > 0; offset /= 2)
-    {
-        gradientSum += __shfl_down_sync(0xffffffff, gradientSum, offset);
-    }
-
-    // First thread in each warp writes to shared memory
-    if (laneIdx == 0)
-    {
-        sharedGradients[warpIdx] = gradientSum;
-    }
-
-    __syncthreads();
-
-    // Final reduction across warps (only in the first warp)
-    if (warpIdx == 0)
-    {
-        gradientSum = (laneIdx < numWarps) ? sharedGradients[laneIdx] : 0.0f;
-
-        // Another warp-level reduction for final sum
-        for (int offset = warpSize / 2; offset > 0; offset /= 2)
-        {
-            gradientSum += __shfl_down_sync(0xffffffff, gradientSum, offset);
-        }
-
-        // First thread writes final result
-        if (laneIdx == 0)
-        {
-            atomicAdd(&gradients[featureIdx], gradientSum / batchSize);
-        }
-    }
-}
-
 // Memory-coalesced prediction kernel that uses shared memory
 __global__ void predictCoalescedKernel(const float *features, const float *weights, float *predictions,
                                        int numSamples, int numFeatures, int batchOffset, int batchSize)
@@ -101,19 +34,27 @@ __global__ void predictCoalescedKernel(const float *features, const float *weigh
 
 // Gradient computation with shared memory
 __global__ void computeGradientsKernel(const float *features, const float *labels,
-                                       const float *predictions, float *gradients,
+                                       const float *predictions, float *gradients, float *mse,
                                        int numSamples, int numFeatures, int batchOffset,
                                        int batchSize)
 {
-    extern __shared__ float sharedGradients[];
+    extern __shared__ float sharedMemory[];
+
+    float *sharedGradients = sharedMemory;                   // Shared memory for gradients
+    float *sharedErrors = &sharedMemory[numFeatures];        // Shared memory for squared errors
 
     int featureIdx = blockIdx.x;
     int localThreadIdx = threadIdx.x;
 
     // Initialize shared memory
-    if (localThreadIdx < numFeatures)
+    if (localThreadIdx < numFeatures && featureIdx < numFeatures)
     {
-        sharedGradients[localThreadIdx] = 0.0f;
+        sharedGradients[featureIdx] = 0.0f; // Initialize gradients for this feature
+    }
+
+    if (localThreadIdx == 0 && featureIdx == 0)
+    {
+        sharedErrors[0] = 0.0f;    // Only one thread initializes the error accumulator
     }
     __syncthreads();
 
@@ -125,11 +66,9 @@ __global__ void computeGradientsKernel(const float *features, const float *label
         {
             float error = predictions[i] - labels[sampleIdx];
             float gradient = error * features[sampleIdx * numFeatures + featureIdx];
-            // atomicAdd(&sharedGradients[featureIdx], gradient);
-            if (featureIdx < numFeatures)
-            {
-                atomicAdd(&sharedGradients[featureIdx], gradient);
-            }
+            atomicAdd(&sharedGradients[featureIdx], gradient);
+            // Accumulate squared error
+            atomicAdd(&sharedErrors[0], error * error);
         }
     }
 
@@ -139,6 +78,12 @@ __global__ void computeGradientsKernel(const float *features, const float *label
     if (localThreadIdx == 0)
     {
         atomicAdd(&gradients[featureIdx], sharedGradients[featureIdx] / batchSize);
+
+        // Compute and store the MSE
+        if (featureIdx == 0) // Only one thread writes the MSE
+        {
+            atomicAdd(mse, sharedErrors[0] / batchSize);
+        }
     }
 }
 

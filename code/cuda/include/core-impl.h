@@ -312,17 +312,18 @@ void CudaSGD::trainWithMemoryCoalescing()
             // Reset gradients
             CHECK_CUDA_ERROR(cudaMemset(d_gradients, 0, numFeatures * sizeof(float)));
 
-            // Use transposed features for coalesced access
+            // 1. Forward pass
             predictCoalescedKernel<<<gridSize, blockSize, numFeatures * sizeof(float)>>>(
                 d_features_transposed, d_weights, d_predictions,
                 numSamples, numFeatures, batchStart, currentBatchSize);
 
-            // Coalesced gradient computation
+            // 2. Compute gradients
             int sharedMemSize = (numFeatures + 1) * sizeof(float);
             computeGradientsKernel<<<numFeatures, gradBlockSize, sharedMemSize>>>(
                 d_features, d_labels, d_predictions, d_gradients, d_mse,
                 numSamples, numFeatures, batchStart, currentBatchSize);
 
+            // 3. Update weights
             updateWeightsKernel<<<(numFeatures + 255) / 256, 256>>>(
                 d_weights, d_gradients, learningRate, numFeatures);
 

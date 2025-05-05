@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=project
-#SBATCH --output=%x.%j.out # %x.%j expands to slurm JobName.JobID
-#SBATCH --error=%x.%j.err
+#SBATCH --job-name=cuda-job
+#SBATCH --output=./benchmarks/cuda-job.%j.out # %x.%j expands to slurm JobName.JobID
+#SBATCH --error=./benchmarks/cuda-job.%j.err
 #SBATCH --partition=gpu
 #SBATCH --qos=standard
 #SBATCH --account=2025-spring-ds-642-bader-af557 # Replace it with your account name
@@ -21,4 +21,4 @@ set -x
 #run pre-compiled program
 
 module load CUDA/12.4.0
-./main
+./code/cuda/main
